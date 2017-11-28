@@ -1,0 +1,154 @@
+
+#+TITLE: Calculating Shot and Pass Chance of Success
+#+AUTHOR: Joseph Neiger
+#+EMAIL: joseph.neiger@gmail.com
+#+REVEAL_THEME: black
+#+REVEAL_TRANS: linear
+#+REVEAL_SPEED: fast
+#+REVEAL_PLUGINS: (notes pdf)
+#+REVEAL_HLEVEL: 1
+#+OPTIONS: toc:nil timestamp:nil reveal_control:t num:nil reveal_history:t tags:nil author:nil
+
+# Export section for md
+* Calculating Shot and Pass Chance of Success {#t20177}                                         :docs:
+
+* Practical Uses of Shot / Pass Chance in Plays
+1. On the low level, where to shoot or pass at target
+2. On the high level, which ally robot to pass to
+
+*** Where to shoot on Goal
+[[file:https://i.imgur.com/mw8Itbr.png]]
+
+*** Best Position to Score when Passing
+[[file:https://i.imgur.com/OJQ8941.png]]
+
+* Two Methods of Calculating Shot / Pass Chance
+- Window Evaluator (WinEval)
+- Kick Evaluator (KickEval)
+
+*** How the Window Evaluator Works
+[[file:https://i.imgur.com/CrqRy5L.gif]]
+
+*** Under the Hood of Window Evaluator
+- Similar to a ray casting algorithm where rays reaching the target are recorded
+- Return Parameters
+  - List of all open segments along the target
+  - Largest segment along the target
+
+*** Window Evaluator Across the Entire Field
+[[file:https://i.imgur.com/0Gdur1O.png]]
+
+* How the Kick Evaluator is Calculated
+- Estimation of a complicated model
+- Estimation breaks down into a few descrete distributions
+  1. Target distribution
+  2. Probability the shot will be blocked
+  3. Physical kick distribution
+
+*** The Kick Evaluator Model
+[[file:https://i.imgur.com/GrTu2JW.png]]
+
+*** The Target Distribution
+[[file:https://i.imgur.com/T0J6Bea.png]]
+
+*** Predicting Opponent Robot Locations
+[[file:https://i.imgur.com/vsFppUh.png]]
+
+*** Calculating the Probability a Opponent Robot will Block the Shot
+[[file:https://i.imgur.com/cUZUfv4.png]]
+
+*** Estimating the Integral
+[[file:https://i.imgur.com/lowGPuh.png]]
+
+*** Combining the Target and Probability Together
+[[file:https://i.imgur.com/epnXfEw.png]]
+
+*** Estimating the Physical Kick Distribution
+[[file:https://i.imgur.com/4hFgpuv.png]]
+
+*** Computing the Convolution with the Kick Distribution
+[[file:https://i.imgur.com/KzRQIVz.png]]
+
+*** Creating a Closed-Form Formula to Program
+[[file:https://i.imgur.com/tFFYXwh.png]]
+
+*** Deciding Where the Best Kick Location Should Be
+[[file:https://i.imgur.com/nEM7wXo.png]]
+
+*** Gradient Ascent Operation
+[[file:https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Gradient_ascent_%28contour%29.png/603px-Gradient_ascent_%28contour%29.png]]
+
+*** Parallel Gradient Ascent Results
+[[file:https://i.imgur.com/hYNGI5M.png]]
+
+*** Kick Evaluator Across the Entire Field
+[[file:https://i.imgur.com/y6kwWnv.png]]
+
+* Using Window and Kick Evaluator in Python
+#+BEGIN_SRC Python
+  win_eval = robocup.WindowEvaluator(main.system_state())
+  windows, best_window = win_eval.eval_pt_to_opp_goal(self.shooting_pos)
+  shot_chance = best_window.shot_success
+#+END_SRC
+
+#+BEGIN_SRC Python
+  kick_eval = robocup.KickEvaluator(main.system_state())
+  best_shot_pt, shot_chance = kick_eval.eval_pt_to_opp_goal(self.shooting_pos)
+#+END_SRC
+
+*** List of valid methods to call on Window and Kick Evaluator
+#+BEGIN_SRC Python
+  eval_pt_to_opp_goal(kicking_pos)
+  eval_pt_to_our_goal(kicking_pos)
+  eval_pt_to_pt(kicking_pos, target_pos, target_width)
+  eval_pt_to_seg(kicking_pos, target_seg)
+  eval_pt_to_robot(kicking_pos, target_pos)
+#+END_SRC
+
+*** Details of Window and Kick Evaluator Return Types
+#+BEGIN_SRC text
+  win_eval - ( windows, best_window )
+  
+    windows - List of valid window segments on the target segment
+    best_window - Longest window on the target segment
+#+END_SRC
+
+#+BEGIN_SRC text
+  kick_eval - ( best_target_point, kick_chance )
+  
+    best_target_point - Best point to kick towards on the target segment
+    kick_chance - Chance of success for passing or shooting
+#+END_SRC
+
+* Pros and Cons of Window Evaluator
+- Pros
+  - Fast (2-5x faster than Kick Evaluator)
+  - Simple to understand and debug
+- Cons
+  - Only accurate for the present, does not do any predictions
+  - Robots outside the target are not accounted for
+  - Kicking distributions are ignored
+  - More difficult to tune correctly
+
+** Pros and Cons of Kick Evaluator
+- Pros
+  - Accuracy
+  - Uses prediction to improve accuracy
+  - Complete model allows for easy improvements
+  - Accounts for opponents behind target when passing
+- Cons
+  - Slower
+  - Much more complicated and reliant on a multitude of assumptions
+
+** Guidelines on when to use one over the other
+- It's mostly personal preference, but in the most extreme cases...
+  - When accuracy is key, use Kick Evaluator
+  - When speed is necessary, use Window Evaluator
+- Just make sure to be consistent when comparing different kick chances
+
+* Your Assignment for today
+- Two Sided Attack
+  - Place two robots on either side of the opponents half. 
+  - Calculate the chance of success for both the pass from the current ball position to that robot and the shot from that robot to the opponent goal
+  - Pass to the one with the higher chance and shoot
+- Skeleton code is in ~soccer/gameplay/plays/skel/two_side_attack.py~
